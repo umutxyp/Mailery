@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Mailery - Email Extractor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+  <style>
+    ::-webkit-scrollbar {
+      width: 16px;
+      height: 16px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background-color: #2c323f;
+      background-clip: padding-box;
+      border: 5px solid transparent;
+      border-radius: 8px;
+    }
+
+    ::-webkit-scrollbar-corner {
+      background-color: transparent;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col">
+  <!-- Custom Title Bar -->
+  <div class="drag-region h-12 bg-gray-800 flex items-center justify-end px-4 space-x-4">
+    <button id="min-btn" class="window-control text-gray-400 hover:text-white">
+      <i class="fa fa-minus"></i>
+    </button>
+    <button id="max-btn" class="window-control text-gray-400 hover:text-white">
+      <i class="fa fa-window-maximize"></i>
+    </button>
+    <button id="close-btn" class="window-control text-gray-400 hover:text-red-500">
+      <i class="fa fa-times"></i>
+    </button>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 p-8 flex flex-col items-center justify-center">
+    <!-- Loading Overlay -->
+    <div id="loading" class="hidden fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50">
+      <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+    </div>
+
+    <div class="w-full max-w-2xl bg-gray-800 rounded-xl p-8 shadow-xl space-y-6">
+      <h1 class="text-3xl font-bold text-center">Mailery - Email Extractor</h1>
+      <p class="text-center text-gray-400">Select Excel files containing website URLs.</p>
+
+      <!-- File Drop Zone -->
+      <div id="drop-zone"
+        class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors">
+        <p class="text-gray-400">Drag Excel files here or</p>
+        <button id="select-files"
+          class="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium">
+          Select Files
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div id="results" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+          <span>Emails Found:</span>
+          <span id="count" class="font-bold text-blue-500">0</span>
+        </div>
+        <div id="email-list" class="h-64 overflow-y-auto border border-gray-700 rounded-lg p-2 text-sm"></div>
+        <button id="download"
+          class="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg transition-colors font-medium">
+          Download (.txt)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-gray-400 text-center py-3">
+    <p>
+      Producer: <a href="https://github.com/umutxyp" class="hover:text-white external-link">umutxyp</a> | Powered by <a
+        href="https://codeshare.me" class="hover:text-white external-link">codeshare.me</a>
+    </p>
+  </footer>
+
+  <script>
+    const { shell, ipcRenderer } = require('electron');
+
+    // Open external links in default browser
+    document.querySelectorAll('.external-link').forEach(link => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        shell.openExternal(link.href);
+      });
+    });
+
+    window.electron = {
+      send: ipcRenderer.send.bind(ipcRenderer),
+      on: ipcRenderer.on.bind(ipcRenderer),
+      invoke: ipcRenderer.invoke.bind(ipcRenderer)
+    };
+
+    let emails = [];
+
+    // File selection handler
+    document.getElementById('select-files').addEventListener('click', async () => {
+      const filePaths = await window.electron.invoke('open-dialog');
+      if (filePaths && filePaths.length > 0) {
+        processFiles(filePaths);
+      }
+    });
+
+    // Download handler
+    document.getElementById('download').addEventListener('click', () => {
+      const blob = new Blob([emails.join('\n')], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `emails-${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // Window controls
+    ['min-btn', 'max-btn', 'close-btn'].forEach(id => {
+      document.getElementById(id).addEventListener('click', () => {
+        window.electron.send(id.replace('-btn', ''));
+      });
+    });
+
+    // Maximize/unmaximize handlers
+    window.electron.on('maximize', () => {
+      const maxBtnIcon = document.querySelector('#max-btn i');
+      maxBtnIcon.classList.remove('fa-window-maximize');
+      maxBtnIcon.classList.add('fa-window-restore');
+    });
+
+    window.electron.on('unmaximize', () => {
+      const maxBtnIcon = document.querySelector('#max-btn i');
+      maxBtnIcon.classList.remove('fa-window-restore');
+      maxBtnIcon.classList.add('fa-window-maximize');
+    });
+
+    // Drag and drop handlers
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => e.preventDefault());
+
+    document.getElementById('drop-zone').addEventListener('drop', async e => {
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files).filter(f => f.name.match(/\.xlsx?$/i));
+      if (files.length > 0) {
+        processFiles(files.map(f => f.path));
+      }
+    });
+
+    // Real-time email updates
+    window.electron.on('email-found', (event, email) => {
+      if (!emails.includes(email)) {
+        emails.push(email);
+        document.getElementById('count').textContent = emails.length;
+        const list = document.getElementById('email-list');
+        const div = document.createElement('div');
+        div.className = 'text-gray-300';
+        div.textContent = email;
+        list.appendChild(div);
+      }
+    });
+
+    async function processFiles(paths) {
+      try {
+        emails = [];
+        document.getElementById('email-list').innerHTML = '';
+        document.getElementById('results').classList.remove('hidden');
+        const result = await window.electron.invoke('process-files', paths.map(p => ({ path: p })));
+        document.getElementById('count').textContent = result.length;
+      } catch (error) {
+        console.error(error);
+        alert('An error occurred while processing the files.');
+      } finally {
+      }
+    }
+
+    function showLoading(show) {
+      document.getElementById('loading').classList.toggle('hidden', !show);
+    }
+  </script>
+</body>
+
+</html>

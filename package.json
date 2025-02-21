@@ -1,0 +1,46 @@
+{
+  "name": "mailery",
+  "version": "1.0.0",
+  "description": "A mail extractor for exel files",
+  "author": "Umut Bayraktar",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-builder --dir",
+    "make": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7",
+    "xlsx": "^0.18.5"
+  },
+  "build": {
+    "appId": "me.codeshare.mailery",
+    "productName": "Mailery",
+    "copyright": "Copyright © 2025 Umut Bayraktar",
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "mailery.ico"
+    },
+    "files": [
+      "**/*"
+    ],
+    "nsis": {
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "uninstallerIcon": "mailery.ico",
+      "uninstallerSidebar": "mailery.png",
+      "oneClick": true,
+      "perMachine": true
+    }
+  }
+}
