@@ -10,7 +10,7 @@ Mailery is a simple and efficient Electron application designed to extract email
 - **Cross-Platform**: Built with Electron, it works on Windows, macOS, and Linux.
 
 ## Demo
-[Mailery Drive Demo Link](https://drive.google.com/file/d/1kPmEJx9x1EWaq0imRb6hJwz9Ln9PtfQ4/view?usp=sharing)
+## [Mailery Drive Demo Link](https://drive.google.com/file/d/1z3jYTsscHNQMoUFxxp7hc674UiaN-jbo/view?usp=sharing)
 
 ## Installation
 
